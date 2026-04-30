@@ -15,9 +15,12 @@ interface SuccessAnimationProps {
 }
 
 export function SuccessAnimation({ clientName, proposalTitle, amount, pdfUrl }: SuccessAnimationProps) {
+  const firstName = clientName?.split(" ")[0] || "there";
+
   useEffect(() => {
     const duration = 3000;
     const end = Date.now() + duration;
+    let rafId: number;
 
     const frame = () => {
       confetti({
@@ -25,26 +28,31 @@ export function SuccessAnimation({ clientName, proposalTitle, amount, pdfUrl }: 
         angle: 60,
         spread: 55,
         origin: { x: 0 },
-        colors: ["#2563eb", "#16a34a", "#7c3aed"],
+        colors: ["#4f46e5", "#16a34a", "#7c3aed"],
       });
       confetti({
         particleCount: 3,
         angle: 120,
         spread: 55,
         origin: { x: 1 },
-        colors: ["#2563eb", "#16a34a", "#7c3aed"],
+        colors: ["#4f46e5", "#16a34a", "#7c3aed"],
       });
 
       if (Date.now() < end) {
-        requestAnimationFrame(frame);
+        rafId = requestAnimationFrame(frame);
       }
     };
 
-    frame();
+    rafId = requestAnimationFrame(frame);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      confetti.reset();
+    };
   }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-50 to-white flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white flex items-center justify-center px-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -55,36 +63,36 @@ export function SuccessAnimation({ clientName, proposalTitle, amount, pdfUrl }: 
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ type: "spring", stiffness: 200, damping: 15, delay: 0.2 }}
-          className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-8"
+          className="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-8"
         >
-          <CheckCircle className="w-12 h-12 text-green-600" />
+          <CheckCircle className="w-12 h-12 text-emerald-600" />
         </motion.div>
 
         <motion.h1
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4 }}
-          className="text-3xl font-bold text-gray-900 mb-3"
+          className="text-3xl font-bold text-slate-900 mb-3"
         >
-          You&apos;re all set, {clientName.split(" ")[0]}!
+          You&apos;re all set, {firstName}!
         </motion.h1>
 
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
-          className="text-gray-500 mb-2"
+          className="text-slate-500 mb-2"
         >
-          Your proposal for <strong className="text-gray-900">{proposalTitle}</strong> has been
+          Your proposal for <strong className="text-slate-900">{proposalTitle}</strong> has been
           signed and payment of{" "}
-          <strong className="text-gray-900">{formatCurrency(amount)}</strong> received.
+          <strong className="text-slate-900">{formatCurrency(amount)}</strong> received.
         </motion.p>
 
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.6 }}
-          className="text-gray-500 mb-8"
+          className="text-slate-500 mb-8"
         >
           A confirmation has been sent to your email. We&apos;re excited to get started!
         </motion.p>
@@ -94,7 +102,7 @@ export function SuccessAnimation({ clientName, proposalTitle, amount, pdfUrl }: 
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.7 }}
         >
-          <Button size="lg" asChild>
+          <Button size="lg" className="bg-indigo-600 hover:bg-indigo-700 text-white" asChild>
             <a href={pdfUrl} target="_blank" rel="noopener noreferrer">
               <Download className="w-4 h-4" />
               Download Your Signed Proposal

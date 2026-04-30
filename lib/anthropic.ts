@@ -50,9 +50,8 @@ export async function generateProposalContent(params: {
   amount: number;
   title: string;
 }): Promise<ProposalContent> {
-  // Mock mode: set MOCK_AI=true in .env.local to skip the Claude API call
   if (process.env.MOCK_AI === "true") {
-    await new Promise((r) => setTimeout(r, 1500)); // simulate latency
+    await new Promise((r) => setTimeout(r, 1500));
     return buildMockContent(params);
   }
 
@@ -66,25 +65,46 @@ Investment Amount: $${params.amount.toLocaleString()}
 Project Description:
 ${params.description}`;
 
-  const response = await getAnthropic().beta.promptCaching.messages.create({
-    model: "claude-opus-4-7",
-    max_tokens: 4096,
-    system: [
-      {
-        type: "text",
-        text: SYSTEM_PROMPT,
-        cache_control: { type: "ephemeral" },
-      },
-    ],
-    messages: [{ role: "user", content: userMessage }],
-  });
+  let response;
+  try {
+    response = await getAnthropic().beta.promptCaching.messages.create({
+      model: "claude-opus-4-7",
+      max_tokens: 4096,
+      system: [
+        {
+          type: "text",
+          text: SYSTEM_PROMPT,
+          cache_control: { type: "ephemeral" },
+        },
+      ],
+      messages: [{ role: "user", content: userMessage }],
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("credit balance") || msg.includes("billing")) {
+      throw new Error("AI generation requires API credits. Please add credits at console.anthropic.com/settings/billing.");
+    }
+    if (msg.includes("API key") || msg.includes("authentication")) {
+      throw new Error("Invalid Anthropic API key. Check your ANTHROPIC_API_KEY environment variable.");
+    }
+    throw new Error("AI generation failed. Please try again.");
+  }
 
-  const text = response.content[0].type === "text" ? response.content[0].text : "";
+  const block = response.content[0];
+  const text = block?.type === "text" ? block.text : "";
+
+  if (!text) {
+    throw new Error("AI returned an empty response. Please try again.");
+  }
 
   try {
     return JSON.parse(text) as ProposalContent;
   } catch {
     const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-    return JSON.parse(cleaned) as ProposalContent;
+    try {
+      return JSON.parse(cleaned) as ProposalContent;
+    } catch {
+      throw new Error("AI returned an unexpected format. Please try again.");
+    }
   }
 }
