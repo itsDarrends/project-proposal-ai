@@ -1,8 +1,8 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { ProposalContent } from "@/lib/supabase/types";
 
-function getAnthropic() {
-  return new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+function getGemini() {
+  return new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY!);
 }
 
 const SYSTEM_PROMPT = `You are an expert business proposal writer. Given a project description and client details, you will generate a professional, compelling proposal in JSON format.
@@ -65,46 +65,35 @@ Investment Amount: $${params.amount.toLocaleString()}
 Project Description:
 ${params.description}`;
 
-  let response;
+  let text: string;
   try {
-    response = await getAnthropic().beta.promptCaching.messages.create({
-      model: "claude-opus-4-7",
-      max_tokens: 4096,
-      system: [
-        {
-          type: "text",
-          text: SYSTEM_PROMPT,
-          cache_control: { type: "ephemeral" },
-        },
-      ],
-      messages: [{ role: "user", content: userMessage }],
+    const model = getGemini().getGenerativeModel({
+      model: "gemini-2.0-flash",
+      systemInstruction: SYSTEM_PROMPT,
     });
+
+    const result = await model.generateContent(userMessage);
+    text = result.response.text();
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (msg.includes("credit balance") || msg.includes("billing")) {
-      throw new Error("AI generation requires API credits. Please add credits at console.anthropic.com/settings/billing.");
+    if (msg.includes("API_KEY") || msg.includes("API key") || msg.includes("authentication")) {
+      throw new Error("Invalid Google AI API key. Check your GOOGLE_AI_API_KEY environment variable.");
     }
-    if (msg.includes("API key") || msg.includes("authentication")) {
-      throw new Error("Invalid Anthropic API key. Check your ANTHROPIC_API_KEY environment variable.");
+    if (msg.includes("quota") || msg.includes("rate limit") || msg.includes("RESOURCE_EXHAUSTED")) {
+      throw new Error("Google AI free tier quota reached. Try again in a minute.");
     }
     throw new Error("AI generation failed. Please try again.");
   }
 
-  const block = response.content[0];
-  const text = block?.type === "text" ? block.text : "";
-
-  if (!text) {
+  if (!text?.trim()) {
     throw new Error("AI returned an empty response. Please try again.");
   }
 
+  const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+
   try {
-    return JSON.parse(text) as ProposalContent;
+    return JSON.parse(cleaned) as ProposalContent;
   } catch {
-    const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-    try {
-      return JSON.parse(cleaned) as ProposalContent;
-    } catch {
-      throw new Error("AI returned an unexpected format. Please try again.");
-    }
+    throw new Error("AI returned an unexpected format. Please try again.");
   }
 }
